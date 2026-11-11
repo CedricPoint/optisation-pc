@@ -626,6 +626,171 @@ def optimize_gpu():
     _warn("Redémarrage requis pour HAGS")
 
 # ═════════════════════════════════════════════════════════════════════════════
+# 11. WINDOWS 11 SPÉCIFIQUE
+# ═════════════════════════════════════════════════════════════════════════════
+def _win11_check() -> bool:
+    try:
+        return int(platform.win32_ver()[1].split(".")[-1]) >= 22000
+    except:
+        return False
+
+def win11_tweaks():
+    _sec("🪟 Optimisations Windows 11")
+    if not _win11_check():
+        _warn("Windows 11 non détecté — ces tweaks fonctionnent aussi sur W10 1903+")
+    HKCU = winreg.HKEY_CURRENT_USER
+    HKLM = winreg.HKEY_LOCAL_MACHINE
+
+    # 1. Power Throttling OFF — CPU délivre sa pleine puissance en permanence
+    reg_set(HKLM, r"SYSTEM\CurrentControlSet\Control\Power\PowerThrottling",
+            "PowerThrottlingOff", 1)
+    _ok("Power Throttling désactivé ⚡ (CPU full perf)")
+
+    # 2. Widgets taskbar
+    reg_set(HKCU, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarDa", 0)
+    reg_set(HKLM, r"SOFTWARE\Policies\Microsoft\Dsh", "AllowNewsAndInterests", 0)
+    _ok("Widgets taskbar désactivés")
+
+    # 3. Teams / Chat taskbar
+    reg_set(HKCU, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced", "TaskbarMn", 0)
+    reg_set(HKLM, r"SOFTWARE\Policies\Microsoft\Windows\Windows Chat", "ChatIcon", 3)
+    _ok("Bouton Teams/Chat désactivé")
+
+    # 4. Copilot
+    reg_set(HKCU, r"Software\Policies\Microsoft\Windows\WindowsCopilot",  "TurnOffWindowsCopilot", 1)
+    reg_set(HKLM, r"SOFTWARE\Policies\Microsoft\Windows\WindowsCopilot", "TurnOffWindowsCopilot", 1)
+    _ok("Copilot désactivé")
+
+    # 5. Délai démarrage Explorer = 0
+    reg_set(HKCU, r"Software\Microsoft\Windows\CurrentVersion\Explorer\Serialize",
+            "StartupDelayInMSec", 0)
+    _ok("Délai démarrage Explorer = 0 ms")
+
+    # 6. Menu delay = 10 ms
+    reg_set(HKCU, r"Control Panel\Desktop", "MenuShowDelay", "10", winreg.REG_SZ)
+    _ok("Délai menus = 10 ms (default = 400)")
+
+    # 7. Transparence off
+    reg_set(HKCU, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+            "EnableTransparency", 0)
+    _ok("Effets de transparence désactivés")
+
+    # 8. Bing + Search Highlights off
+    reg_set(HKCU, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Search", "BingSearchEnabled",  0)
+    reg_set(HKCU, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Search", "CortanaConsent",     0)
+    reg_set(HKCU, r"SOFTWARE\Microsoft\Windows\CurrentVersion\SearchSettings",
+            "IsDynamicSearchBoxEnabled", 0)
+    reg_set(HKLM, r"SOFTWARE\Policies\Microsoft\Windows\Windows Search", "DisableWebSearch", 1)
+    _ok("Bing + surlignage recherche désactivés")
+
+    # 9. Apps arrière-plan
+    reg_set(HKCU, r"Software\Microsoft\Windows\CurrentVersion\BackgroundAccessApplications",
+            "GlobalUserDisabled", 1)
+    _ok("Applications arrière-plan désactivées")
+
+    # 10. Windows Spotlight / pubs écran de verrouillage
+    reg_set(HKCU, r"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
+            "DisableWindowsSpotlightFeatures", 1)
+    reg_set(HKCU, r"SOFTWARE\Policies\Microsoft\Windows\CloudContent",
+            "DisableCloudOptimizedContent", 1)
+    _ok("Windows Spotlight (pubs écran verrou) désactivé")
+
+    # 11. MAJ : repoussées 1 an + pas de redémarrage auto
+    reg_set(HKLM, r"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate",
+            "DeferFeatureUpdatesPeriodInDays", 365)
+    reg_set(HKLM, r"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU",
+            "NoAutoRebootWithLoggedOnUsers", 1)
+    reg_set(HKLM, r"SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU",
+            "AUOptions", 2)  # 2 = notify only
+    _ok("Mises à jour fonctionnelles repoussées 1 an, redémarrage auto désactivé")
+
+    # 12. Notifications toasts
+    reg_set(HKCU, r"SOFTWARE\Microsoft\Windows\CurrentVersion\PushNotifications", "ToastEnabled", 0)
+    _ok("Notifications toast désactivées")
+
+    # 13. Section Recommandé dans Démarrer
+    reg_set(HKLM, r"SOFTWARE\Policies\Microsoft\Windows\Explorer", "HideRecommendedSection", 1)
+    _ok("Section 'Recommandé' Start menu masquée")
+
+    # 14. Bouton Vue des tâches
+    reg_set(HKCU, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+            "ShowTaskViewButton", 0)
+    _ok("Bouton Vue des tâches masqué")
+
+    # 15. Fichiers récents dans Démarrer
+    reg_set(HKCU, r"SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced",
+            "Start_TrackDocs", 0)
+    _ok("Fichiers récents dans Démarrer désactivés")
+
+    # 16. NTFS 8.3 noms courts (perf SSD/NVMe)
+    c, _ = run(["fsutil", "8dot3name", "set", "1"])
+    if c == 0: _ok("NTFS: noms 8.3 désactivés (perf NVMe)")
+
+    # 17. Journalisation dernier accès NTFS niveau 3 (perf max)
+    run(["fsutil", "behavior", "set", "disablelastaccess", "3"])
+    _ok("NTFS last access: journalisation désactivée (mode 3)")
+
+    # 18. OneDrive: retire du démarrage automatique
+    reg_del(HKCU, r"Software\Microsoft\Windows\CurrentVersion\Run", "OneDrive")
+    _ok("OneDrive retiré du démarrage automatique")
+
+    console.print()
+    _ok(f"[bold green]18 tweaks Windows 11 appliqués[/]")
+    _warn("Reconnectez-vous ou redémarrez pour les changements visuels")
+
+
+def win11_hvci():
+    _sec("🛡  Memory Integrity / HVCI — Gain FPS gaming")
+    console.print(Panel(
+        "  [yellow]Memory Integrity (HVCI)[/] isole le code du noyau dans une VM sécurisée.\n\n"
+        "  [green]✓ Avantage[/] : [bold]+5 à +15% de FPS[/] selon les jeux, surtout sur [bold]AMD Ryzen[/].\n"
+        "  [red]✗ Inconvénient[/] : Réduit la protection contre les injections kernel-level.\n"
+        "     Windows Defender et les antivirus [bold]restent entièrement actifs[/].\n\n"
+        "  [dim]Pour réactiver : Sécurité Windows → Sécurité des appareils → Intégrité mémoire[/]",
+        title="[bold]Memory Integrity (HVCI)[/]", border_style="yellow"
+    ))
+    if not Confirm.ask("\n  Désactiver Memory Integrity (HVCI) ?", default=False):
+        return
+    HKLM = winreg.HKEY_LOCAL_MACHINE
+    reg_set(HKLM,
+            r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity",
+            "Enabled", 0)
+    reg_set(HKLM,
+            r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity",
+            "WasEnabledBy", 0)
+    _ok("HVCI/Memory Integrity désactivé")
+    _warn("REDÉMARRAGE REQUIS — l'effet n'est visible qu'après le redémarrage")
+
+
+def win11_vbs():
+    _sec("🔓  VBS — Virtualization Based Security (gain FPS maximum)")
+    console.print(Panel(
+        "  [bold red]⚠  ATTENTION — Réduction importante de la sécurité système.[/]\n\n"
+        "  VBS crée un hypervisor Hyper-V isolé pour protéger les processus critiques.\n"
+        "  [green]✓ Avantage[/] : [bold]+5 à +25% de FPS[/] selon la config, surtout [bold]AMD Ryzen[/].\n"
+        "  [red]✗ Risque[/] : Désactive HVCI + Credential Guard. Vulnérabilités kernel possibles.\n\n"
+        "  [yellow]Recommandé UNIQUEMENT sur PC dédié gaming sans données sensibles.[/]\n"
+        "  [dim]Réactivez : Sécurité Windows → Sécurité appareils → Intégrité mémoire[/]",
+        title="[bold red]AVERTISSEMENT SÉCURITÉ[/]", border_style="red"
+    ))
+    _warn("DÉCONSEILLÉ sur PC de travail, PC avec données sensibles ou PC d'entreprise.")
+    if not Confirm.ask("\n  Désactiver VBS ? (redémarrage requis)", default=False):
+        return
+    HKLM = winreg.HKEY_LOCAL_MACHINE
+    code, _ = run(["bcdedit", "/set", "hypervisorlaunchtype", "off"])
+    reg_set(HKLM, r"SYSTEM\CurrentControlSet\Control\DeviceGuard", "EnableVirtualizationBasedSecurity", 0)
+    reg_set(HKLM, r"SYSTEM\CurrentControlSet\Control\DeviceGuard", "RequirePlatformSecurityFeatures",   0)
+    reg_set(HKLM,
+            r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity",
+            "Enabled", 0)
+    if code == 0:
+        _ok("VBS désactivé via bcdedit + registre")
+    else:
+        _warn("bcdedit a échoué — clés registre appliquées (effet partiel possible)")
+    _warn("REDÉMARRAGE REQUIS — l'effet n'est visible qu'après le redémarrage")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
 # 10. RESTAURATION
 # ═════════════════════════════════════════════════════════════════════════════
 def create_restore_point():
@@ -656,7 +821,7 @@ def profile_gaming():
     clean_temp(); clean_thumbnails(); clean_dns(); clean_recycle()
     perf_ultimate_power(); perf_cpu_priority(); perf_visual_effects(); perf_ssd()
     gaming_tweaks(); gaming_timer()
-    optimize_services("gaming"); optimize_gpu()
+    optimize_services("gaming"); optimize_gpu(); win11_tweaks()
     console.print()
     console.print(Panel("[bold green]✓  Profil Gaming appliqué ! Redémarrez votre PC.[/]", border_style="green"))
 
@@ -668,7 +833,7 @@ def profile_all():
     perf_ultimate_power(); perf_cpu_priority(); perf_visual_effects(); perf_ssd()
     gaming_tweaks(); gaming_timer()
     net_optimize(); optimize_services("gaming")
-    privacy_tweaks(); optimize_gpu(); clean_ram()
+    privacy_tweaks(); optimize_gpu(); clean_ram(); win11_tweaks()
     console.print()
     console.print(Panel("[bold green]✓  Optimisation complète terminée ! Redémarrez votre PC.[/]",
                         border_style="green"))
@@ -724,6 +889,14 @@ def menu_gaming():
         ("3", "Optimisation GPU",            optimize_gpu),
     ], "bold red")
 
+def menu_win11():
+    _run_sub("🪟 Windows 11", [
+        ("1", "Tweaks W11 complets (18 optimisations)",          win11_tweaks),
+        ("2", "Memory Integrity / HVCI  (+5–15% FPS gaming)",   win11_hvci),
+        ("3", "[red]VBS off — gain max  (⚠ sécurité réduite)[/]", win11_vbs),
+    ], "bold magenta")
+
+
 def main_menu():
     elevate()
 
@@ -747,6 +920,7 @@ def main_menu():
             ("P2", "[red]Profil Gaming[/]"),
             ("P3", "[bold bright_red]⚡ TOUT OPTIMISER[/]"),
             ("",   ""),
+            ("W",  "🪟  Windows 11 (18 tweaks + HVCI + VBS)"),
             ("R",  "🛡   Point de restauration"),
             ("L",  "📋  Voir le fichier de log"),
             ("0",  "[dim_w]Quitter[/]"),
@@ -774,6 +948,7 @@ def main_menu():
             "P1": lambda: (profile_bureautique(),      _pause()),
             "P2": lambda: (profile_gaming(),           _pause()),
             "P3": lambda: (profile_all(),              _pause()),
+            "W":  menu_win11,
             "R":  lambda: (create_restore_point(),     _pause()),
             "L":  lambda: (console.print(f"\n  [dim]Log: {LOG_FILE}[/]\n"), _pause()),
         }
